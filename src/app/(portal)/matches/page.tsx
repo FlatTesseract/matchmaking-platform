@@ -2,43 +2,71 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { Search, Filter, Grid3X3, List, SortAsc } from "lucide-react";
+import { Search, Grid3X3, List } from "lucide-react";
 import { MatchCard } from "@/components/portal/match-card";
 import { EmptyState } from "@/components/portal/empty-state";
-import { matches } from "@/lib/mock-data";
+import { MatchesGridSkeleton } from "@/components/portal/loading-skeleton";
+import { ErrorState } from "@/components/portal/error-state";
+import { useMatches } from "@/hooks/useMatches";
 
 type FilterStatus = "all" | "new" | "viewed" | "interested";
 type SortOption = "compatibility" | "recent" | "age";
 
 export default function MatchesPage() {
+  const { matches, isLoading, isError, mutate } = useMatches();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
   const [sortBy, setSortBy] = useState<SortOption>("compatibility");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
+  if (isLoading) {
+    return (
+      <div className="p-4 lg:p-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-serif font-bold text-[#2D1318] mb-2">My Matches</h1>
+          <p className="text-[#6B5B5E]">Your curated matches, handpicked by our matchmaker based on your preferences.</p>
+        </div>
+        <MatchesGridSkeleton />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return <ErrorState message="We couldn't load your matches." onRetry={() => mutate()} />;
+  }
+
+  // Map API status to filter status
+  const mapStatus = (apiStatus: string): FilterStatus => {
+    if (apiStatus === "sent" || apiStatus === "new") return "new";
+    if (apiStatus === "viewed") return "viewed";
+    if (apiStatus === "interested_1" || apiStatus === "interested_2" || apiStatus === "mutual") return "interested";
+    return "new";
+  };
+
   // Filter matches
-  let filteredMatches = matches.filter((match) => {
-    if (filterStatus !== "all" && match.status !== filterStatus) return false;
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  let filteredMatches = matches.filter((match: any) => {
+    const matchFilterStatus = mapStatus(match.status);
+    if (filterStatus !== "all" && matchFilterStatus !== filterStatus) return false;
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      return (
-        match.profile.name.toLowerCase().includes(query) ||
-        match.profile.location.toLowerCase().includes(query) ||
-        match.profile.occupation.toLowerCase().includes(query)
-      );
+      const name = (match.name || "").toLowerCase();
+      const location = (match.location || "").toLowerCase();
+      const occupation = (match.occupation || "").toLowerCase();
+      return name.includes(query) || location.includes(query) || occupation.includes(query);
     }
     return true;
   });
 
   // Sort matches
-  filteredMatches = filteredMatches.sort((a, b) => {
+  filteredMatches = [...filteredMatches].sort((a: any, b: any) => {
     switch (sortBy) {
       case "compatibility":
-        return b.compatibilityScore - a.compatibilityScore;
+        return (b.compatibility_score || 0) - (a.compatibility_score || 0);
       case "recent":
-        return new Date(b.matchedAt).getTime() - new Date(a.matchedAt).getTime();
+        return new Date(b.matched_at || 0).getTime() - new Date(a.matched_at || 0).getTime();
       case "age":
-        return a.profile.age - b.profile.age;
+        return (a.age || 0) - (b.age || 0);
       default:
         return 0;
     }
@@ -46,14 +74,13 @@ export default function MatchesPage() {
 
   const statusCounts = {
     all: matches.length,
-    new: matches.filter((m) => m.status === "new").length,
-    viewed: matches.filter((m) => m.status === "viewed").length,
-    interested: matches.filter((m) => m.status === "interested").length,
+    new: matches.filter((m: any) => mapStatus(m.status) === "new").length,
+    viewed: matches.filter((m: any) => mapStatus(m.status) === "viewed").length,
+    interested: matches.filter((m: any) => mapStatus(m.status) === "interested").length,
   };
 
   return (
     <div className="p-4 lg:p-8">
-      {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-serif font-bold text-[#2D1318] mb-2">My Matches</h1>
         <p className="text-[#6B5B5E]">
@@ -61,10 +88,8 @@ export default function MatchesPage() {
         </p>
       </div>
 
-      {/* Filters & Search */}
       <div className="bg-white rounded-2xl shadow-sm border border-[#FECDD3]/50 p-4 mb-6">
         <div className="flex flex-col lg:flex-row gap-4">
-          {/* Search */}
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#6B5B5E]" />
             <input
@@ -77,7 +102,6 @@ export default function MatchesPage() {
             />
           </div>
 
-          {/* Status Filter */}
           <div className="flex gap-2 overflow-x-auto pb-2 lg:pb-0">
             {(["all", "new", "viewed", "interested"] as FilterStatus[]).map((status) => (
               <button
@@ -96,7 +120,6 @@ export default function MatchesPage() {
             ))}
           </div>
 
-          {/* Sort & View */}
           <div className="flex gap-2">
             <select
               value={sortBy}
@@ -133,7 +156,6 @@ export default function MatchesPage() {
         </div>
       </div>
 
-      {/* Results */}
       {filteredMatches.length === 0 ? (
         <EmptyState
           type={searchQuery ? "search" : "matches"}
@@ -146,12 +168,10 @@ export default function MatchesPage() {
         />
       ) : (
         <>
-          {/* Results count */}
           <p className="text-sm text-[#6B5B5E] mb-4">
             Showing {filteredMatches.length} {filteredMatches.length === 1 ? "match" : "matches"}
           </p>
 
-          {/* Matches Grid */}
           <div
             className={cn(
               "grid gap-6",
@@ -160,7 +180,7 @@ export default function MatchesPage() {
                 : "grid-cols-1"
             )}
           >
-            {filteredMatches.map((match) => (
+            {filteredMatches.map((match: any) => (
               <MatchCard key={match.id} match={match} />
             ))}
           </div>

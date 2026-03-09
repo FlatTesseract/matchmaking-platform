@@ -1,21 +1,17 @@
 'use client';
 
-import { useState } from 'react';
-import {
-  mockConversations,
-  Conversation,
-  Message,
-} from '@/lib/mock-admin-data';
+import { useState, useEffect, useRef } from 'react';
+import useSWR from 'swr';
 import {
   MessageCircle,
   Search,
   Send,
   MoreVertical,
-  Phone,
-  Video,
   User,
   Clock,
   ChevronLeft,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,6 +19,33 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+
+const fetcher = (url: string) =>
+  fetch(url).then((r) => {
+    if (!r.ok) throw new Error('Failed');
+    return r.json();
+  });
+
+interface ConversationItem {
+  id: string;
+  participantName: string;
+  participantPhoto: string;
+  participantId: string;
+  lastMessage: string;
+  lastMessageAt: string;
+  unreadCount: number;
+}
+
+interface MessageItem {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderAvatar: string;
+  content: string;
+  timestamp: string;
+  isFromMatchmaker: boolean;
+}
 
 function formatTime(dateString: string) {
   const date = new Date(dateString);
@@ -53,12 +76,12 @@ function formatFullTime(dateString: string) {
   });
 }
 
-function ConversationItem({
+function ConversationListItem({
   conversation,
   isSelected,
   onClick,
 }: {
-  conversation: Conversation;
+  conversation: ConversationItem;
   isSelected: boolean;
   onClick: () => void;
 }) {
@@ -90,7 +113,7 @@ function ConversationItem({
           >
             {conversation.participantName}
           </h3>
-          <span className="text-xs text-[#6B5B5E] flex-shrink-0">
+          <span className="text-xs text-[#6B5B5E] flex-shrink-0 ml-2">
             {formatTime(conversation.lastMessageAt)}
           </span>
         </div>
@@ -107,30 +130,42 @@ function ConversationItem({
   );
 }
 
-function MessageBubble({ message }: { message: Message }) {
+function MessageBubble({ message }: { message: MessageItem }) {
+  const isAdmin = message.isFromMatchmaker;
+
   return (
     <div
       className={cn(
         'flex mb-4',
-        message.isAdmin ? 'justify-end' : 'justify-start'
+        isAdmin ? 'justify-end' : 'justify-start'
       )}
     >
+      {!isAdmin && (
+        <div className="w-8 h-8 rounded-full bg-[#F5E0E8] flex items-center justify-center text-[#7B1E3A] font-bold text-xs mr-2 mt-1 flex-shrink-0">
+          {message.senderName.charAt(0)}
+        </div>
+      )}
       <div
         className={cn(
           'max-w-[70%] rounded-2xl px-4 py-3',
-          message.isAdmin
+          isAdmin
             ? 'bg-[#7B1E3A] text-white rounded-br-md'
             : 'bg-[#F5E0E8] text-[#2D1318] rounded-bl-md'
         )}
       >
+        {!isAdmin && (
+          <p className="text-xs font-semibold text-[#7B1E3A] mb-1">
+            {message.senderName}
+          </p>
+        )}
         <p className="text-sm whitespace-pre-wrap">{message.content}</p>
         <p
           className={cn(
             'text-xs mt-1',
-            message.isAdmin ? 'text-white/70' : 'text-[#6B5B5E]'
+            isAdmin ? 'text-white/70' : 'text-[#6B5B5E]'
           )}
         >
-          {formatFullTime(message.sentAt)}
+          {formatFullTime(message.timestamp)}
         </p>
       </div>
     </div>
@@ -138,48 +173,88 @@ function MessageBubble({ message }: { message: Message }) {
 }
 
 export default function MessagesPage() {
-  const [conversations, setConversations] = useState(mockConversations);
-  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(
-    mockConversations[0]?.id || null
-  );
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showMobileList, setShowMobileList] = useState(true);
+  const [sending, setSending] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const selectedConversation = conversations.find(
-    (c) => c.id === selectedConversationId
+  // Fetch conversations
+  const {
+    data: convoData,
+    error: convoError,
+    isLoading: convoLoading,
+    mutate: mutateConversations,
+  } = useSWR<{ conversations: ConversationItem[] }>('/api/messages', fetcher, {
+    refreshInterval: 15000,
+  });
+
+  // Fetch messages for selected conversation
+  const {
+    data: msgData,
+    error: msgError,
+    isLoading: msgLoading,
+    mutate: mutateMessages,
+  } = useSWR<{ messages: MessageItem[] }>(
+    selectedConversationId ? `/api/messages/${selectedConversationId}` : null,
+    fetcher,
+    { refreshInterval: 5000 }
   );
+
+  const conversations = convoData?.conversations || [];
+  const messages = msgData?.messages || [];
+
+  // Auto-select first conversation
+  useEffect(() => {
+    if (!selectedConversationId && conversations.length > 0) {
+      setSelectedConversationId(conversations[0].id);
+    }
+  }, [conversations, selectedConversationId]);
+
+  // Scroll to bottom on new messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   const filteredConversations = conversations.filter((c) =>
     c.participantName.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleSendMessage = () => {
+  const selectedConversation = conversations.find(
+    (c) => c.id === selectedConversationId
+  );
+
+  const totalUnread = conversations.reduce((sum, c) => sum + c.unreadCount, 0);
+
+  const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedConversationId) return;
 
-    const newMsg: Message = {
-      id: `msg${Date.now()}`,
-      senderId: 'admin',
-      senderName: 'Matchmaker',
-      content: newMessage.trim(),
-      sentAt: new Date().toISOString(),
-      isAdmin: true,
-    };
-
-    setConversations((prev) =>
-      prev.map((c) =>
-        c.id === selectedConversationId
-          ? {
-              ...c,
-              messages: [...c.messages, newMsg],
-              lastMessage: newMessage.trim(),
-              lastMessageAt: new Date().toISOString(),
-            }
-          : c
-      )
-    );
-
+    const content = newMessage.trim();
+    setSending(true);
     setNewMessage('');
+
+    try {
+      const res = await fetch(`/api/messages/${selectedConversationId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to send message');
+      }
+
+      mutateMessages();
+      mutateConversations();
+    } catch {
+      toast.error('Failed to send message', {
+        description: 'Please try again.',
+      });
+      setNewMessage(content);
+    } finally {
+      setSending(false);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -192,19 +267,40 @@ export default function MessagesPage() {
   const selectConversation = (id: string) => {
     setSelectedConversationId(id);
     setShowMobileList(false);
-    // Mark as read
-    setConversations((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, unreadCount: 0 } : c))
-    );
   };
 
-  const totalUnread = conversations.reduce((sum, c) => sum + c.unreadCount, 0);
+  // Loading state
+  if (convoLoading) {
+    return (
+      <div className="p-8 flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <Loader2 className="w-10 h-10 text-[#7B1E3A] animate-spin mx-auto mb-4" />
+          <p className="text-[#6B5B5E]">Loading conversations...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (convoError) {
+    return (
+      <div className="p-8 flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-[#2D1318] mb-2">Failed to Load</h2>
+          <p className="text-[#6B5B5E]">
+            Could not load conversations. Please refresh the page.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8 h-[calc(100vh-2rem)]">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-[#2D1318] flex items-center gap-3">
+        <h1 className="text-3xl font-bold font-serif text-[#2D1318] flex items-center gap-3">
           <MessageCircle className="w-8 h-8 text-[#7B1E3A]" />
           Messages
           {totalUnread > 0 && (
@@ -243,7 +339,7 @@ export default function MessagesPage() {
             <ScrollArea className="flex-1">
               <div className="divide-y divide-[#F5E0E8]">
                 {filteredConversations.map((conversation) => (
-                  <ConversationItem
+                  <ConversationListItem
                     key={conversation.id}
                     conversation={conversation}
                     isSelected={selectedConversationId === conversation.id}
@@ -253,7 +349,11 @@ export default function MessagesPage() {
                 {filteredConversations.length === 0 && (
                   <div className="p-8 text-center">
                     <MessageCircle className="w-12 h-12 text-[#F5E0E8] mx-auto mb-3" />
-                    <p className="text-[#6B5B5E]">No conversations found</p>
+                    <p className="text-[#6B5B5E]">
+                      {conversations.length === 0
+                        ? 'No conversations yet'
+                        : 'No conversations found'}
+                    </p>
                   </div>
                 )}
               </div>
@@ -313,11 +413,32 @@ export default function MessagesPage() {
 
                 {/* Messages */}
                 <ScrollArea className="flex-1 p-6">
-                  <div className="space-y-1">
-                    {selectedConversation.messages.map((message) => (
-                      <MessageBubble key={message.id} message={message} />
-                    ))}
-                  </div>
+                  {msgLoading ? (
+                    <div className="flex items-center justify-center h-full">
+                      <Loader2 className="w-8 h-8 text-[#7B1E3A] animate-spin" />
+                    </div>
+                  ) : msgError ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-center">
+                        <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
+                        <p className="text-[#6B5B5E] text-sm">Failed to load messages</p>
+                      </div>
+                    </div>
+                  ) : messages.length === 0 ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-center">
+                        <MessageCircle className="w-12 h-12 text-[#F5E0E8] mx-auto mb-3" />
+                        <p className="text-[#6B5B5E]">No messages yet. Start the conversation!</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      {messages.map((message) => (
+                        <MessageBubble key={message.id} message={message} />
+                      ))}
+                      <div ref={messagesEndRef} />
+                    </div>
+                  )}
                 </ScrollArea>
 
                 {/* Message Input */}
@@ -333,10 +454,14 @@ export default function MessagesPage() {
                     />
                     <Button
                       onClick={handleSendMessage}
-                      disabled={!newMessage.trim()}
+                      disabled={!newMessage.trim() || sending}
                       className="bg-[#7B1E3A] hover:bg-[#5C1229] text-white h-11 px-4"
                     >
-                      <Send className="w-5 h-5" />
+                      {sending ? (
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <Send className="w-5 h-5" />
+                      )}
                     </Button>
                   </div>
                   <p className="text-xs text-[#6B5B5E] mt-2">

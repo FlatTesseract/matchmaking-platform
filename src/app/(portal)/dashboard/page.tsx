@@ -8,28 +8,64 @@ import {
   MessageCircle,
   TrendingUp,
   ArrowRight,
-  Bell,
   CheckCircle,
   Calendar,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MatchCard } from "@/components/portal/match-card";
-import { currentUser, matches, notifications, dashboardStats, introductions } from "@/lib/mock-data";
+import { ProfileStatusBanner } from "@/components/portal/profile-status-banner";
+import { DashboardSkeleton } from "@/components/portal/loading-skeleton";
+import { ErrorState } from "@/components/portal/error-state";
+import { EmptyState } from "@/components/portal/empty-state";
+import { useProfile } from "@/hooks/useProfile";
+import { useMatches } from "@/hooks/useMatches";
+import { useIntroductions } from "@/hooks/useMatches";
+import { useNotifications } from "@/hooks/useNotifications";
 
 export default function DashboardPage() {
+  const { profile, isLoading: profileLoading, isError: profileError, mutate: mutateProfile } = useProfile();
+  const { matches, isLoading: matchesLoading, isError: matchesError, mutate: mutateMatches } = useMatches();
+  const { introductions, isLoading: introsLoading } = useIntroductions();
+  const { notifications, unreadCount } = useNotifications();
+
+  const isLoading = profileLoading || matchesLoading || introsLoading;
+
+  if (isLoading) return <DashboardSkeleton />;
+  if (profileError || matchesError) {
+    return (
+      <ErrorState
+        message="We couldn't load your dashboard. Please try again."
+        onRetry={() => { mutateProfile(); mutateMatches(); }}
+      />
+    );
+  }
+
+  const profileStatus = profile?.status || "draft";
+  const profileCompletion = calculateCompletion(profile);
   const recentMatches = matches.slice(0, 3);
-  const recentNotifications = notifications.slice(0, 4);
-  const upcomingMeeting = introductions.find((i) => i.status === "meeting_scheduled");
+  const recentNotifications = (notifications || []).slice(0, 4);
+  const newMatchCount = matches.filter((m: { status: string }) => m.status === "new" || m.status === "sent").length;
+  const activeIntros = (introductions || []).filter(
+    (i: { status: string }) => i.status === "pending" || i.status === "accepted"
+  ).length;
+  const upcomingMeeting = (introductions || []).find(
+    (i: { status: string }) => i.status === "meeting_scheduled"
+  );
 
   return (
     <div className="p-4 lg:p-8 space-y-8">
+      {/* Profile Status Banner */}
+      {profileStatus !== "active" && (
+        <ProfileStatusBanner status={profileStatus} />
+      )}
+
       {/* Profile Completion Banner */}
-      {currentUser.profileCompletion < 100 && (
+      {profileStatus === "active" && profileCompletion < 100 && (
         <div className="bg-gradient-to-r from-[#7B1E3A] to-[#9E3A55] rounded-2xl p-6 text-white">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center">
-                <span className="text-2xl font-bold">{currentUser.profileCompletion}%</span>
+                <span className="text-2xl font-bold">{profileCompletion}%</span>
               </div>
               <div>
                 <h2 className="text-xl font-serif font-bold mb-1">Complete Your Profile</h2>
@@ -45,12 +81,11 @@ export default function DashboardPage() {
               </Button>
             </Link>
           </div>
-          {/* Progress bar */}
           <div className="mt-4">
             <div className="h-2 bg-white/20 rounded-full overflow-hidden">
               <div
                 className="h-full bg-[#C9956B] rounded-full transition-all duration-500"
-                style={{ width: `${currentUser.profileCompletion}%` }}
+                style={{ width: `${profileCompletion}%` }}
               />
             </div>
           </div>
@@ -61,33 +96,32 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           label="Total Matches"
-          value={dashboardStats.totalMatches}
+          value={matches.length}
           icon={Users}
-          trend="+3 this week"
           color="burgundy"
         />
         <StatCard
           label="New Matches"
-          value={dashboardStats.newMatches}
+          value={newMatchCount}
           icon={Heart}
           color="gold"
         />
         <StatCard
           label="Active Introductions"
-          value={dashboardStats.activeIntroductions}
+          value={activeIntros}
           icon={TrendingUp}
           color="rose"
         />
         <StatCard
           label="Unread Messages"
-          value={dashboardStats.messagesUnread}
+          value={unreadCount}
           icon={MessageCircle}
           color="cream"
         />
       </div>
 
       {/* Upcoming Meeting Alert */}
-      {upcomingMeeting && (
+      {upcomingMeeting?.meeting_details && (
         <div className="bg-[#F5E0E8] border border-[#FECDD3] rounded-2xl p-6">
           <div className="flex flex-col md:flex-row md:items-center gap-4">
             <div className="w-12 h-12 rounded-full bg-[#7B1E3A] flex items-center justify-center flex-shrink-0">
@@ -95,11 +129,11 @@ export default function DashboardPage() {
             </div>
             <div className="flex-1">
               <h3 className="font-semibold text-[#2D1318] font-serif text-lg">
-                Upcoming Meeting with {upcomingMeeting.matchName}
+                Upcoming Meeting with {upcomingMeeting.match_name}
               </h3>
               <p className="text-[#6B5B5E] text-sm">
-                {upcomingMeeting.meetingDetails?.date} at {upcomingMeeting.meetingDetails?.time} •{" "}
-                {upcomingMeeting.meetingDetails?.location}
+                {upcomingMeeting.meeting_details.date} at {upcomingMeeting.meeting_details.time} •{" "}
+                {upcomingMeeting.meeting_details.location}
               </p>
             </div>
             <Link href="/introductions">
@@ -127,23 +161,40 @@ export default function DashboardPage() {
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {recentMatches.map((match) => (
-              <MatchCard key={match.id} match={match} />
-            ))}
-          </div>
+          {recentMatches.length === 0 ? (
+            <EmptyState type="matches" />
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {recentMatches.map((match: { id: string }) => (
+                <MatchCard key={match.id} match={match} />
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Notifications Sidebar */}
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-serif font-bold text-[#2D1318]">Notifications</h2>
-            <Bell className="w-5 h-5 text-[#6B5B5E]" />
           </div>
           <div className="bg-white rounded-2xl shadow-sm border border-[#FECDD3]/50 divide-y divide-[#F5E0E8]">
-            {recentNotifications.map((notification) => (
-              <NotificationItem key={notification.id} notification={notification} />
-            ))}
+            {recentNotifications.length === 0 ? (
+              <div className="p-6 text-center text-sm text-[#6B5B5E]">No notifications yet</div>
+            ) : (
+              recentNotifications.map(
+                (notification: {
+                  id: string;
+                  type: string;
+                  title: string;
+                  message: string;
+                  is_read: boolean;
+                  link: string | null;
+                  created_at: string;
+                }) => (
+                  <NotificationItem key={notification.id} notification={notification} />
+                )
+              )
+            )}
           </div>
         </div>
       </div>
@@ -171,6 +222,28 @@ export default function DashboardPage() {
       </div>
     </div>
   );
+}
+
+function calculateCompletion(profile: Record<string, unknown> | null): number {
+  if (!profile) return 0;
+  const sections = [
+    "basic_info",
+    "education_career",
+    "family_background",
+    "values_beliefs",
+    "lifestyle",
+    "personality",
+    "partner_preferences",
+  ];
+  let filled = 0;
+  for (const section of sections) {
+    if (profile[section] && Object.keys(profile[section] as object).length > 0) {
+      filled++;
+    }
+  }
+  const hasPhotos = Array.isArray(profile.photos) && (profile.photos as string[]).length > 0;
+  if (hasPhotos) filled++;
+  return Math.round((filled / (sections.length + 1)) * 100);
 }
 
 function StatCard({
@@ -211,33 +284,44 @@ function StatCard({
   );
 }
 
-function NotificationItem({ notification }: { notification: typeof notifications[0] }) {
-  const iconMap = {
+function NotificationItem({
+  notification,
+}: {
+  notification: {
+    id: string;
+    type: string;
+    title: string;
+    message: string;
+    is_read: boolean;
+    link: string | null;
+    created_at: string;
+  };
+}) {
+  const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
     match: Heart,
     introduction: CheckCircle,
     message: MessageCircle,
-    system: Bell,
   };
-  const Icon = iconMap[notification.type];
+  const Icon = iconMap[notification.type] || CheckCircle;
 
-  return (
-    <Link href={notification.link || "#"} className="block p-4 hover:bg-[#FFF8F0] transition-colors">
+  const content = (
+    <div className="block p-4 hover:bg-[#FFF8F0] transition-colors">
       <div className="flex gap-3">
         <div
           className={cn(
             "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0",
-            notification.isRead ? "bg-[#F5E0E8]" : "bg-[#7B1E3A]"
+            notification.is_read ? "bg-[#F5E0E8]" : "bg-[#7B1E3A]"
           )}
         >
-          <Icon className={cn("w-4 h-4", notification.isRead ? "text-[#7B1E3A]" : "text-white")} />
+          <Icon className={cn("w-4 h-4", notification.is_read ? "text-[#7B1E3A]" : "text-white")} />
         </div>
         <div className="flex-1 min-w-0">
-          <p className={cn("text-sm", notification.isRead ? "text-[#6B5B5E]" : "font-semibold text-[#2D1318]")}>
+          <p className={cn("text-sm", notification.is_read ? "text-[#6B5B5E]" : "font-semibold text-[#2D1318]")}>
             {notification.title}
           </p>
-          <p className="text-xs text-[#6B5B5E] truncate">{notification.description}</p>
+          <p className="text-xs text-[#6B5B5E] truncate">{notification.message}</p>
           <p className="text-xs text-[#C9956B] mt-1">
-            {new Date(notification.timestamp).toLocaleDateString("en-US", {
+            {new Date(notification.created_at).toLocaleDateString("en-US", {
               month: "short",
               day: "numeric",
               hour: "numeric",
@@ -246,8 +330,13 @@ function NotificationItem({ notification }: { notification: typeof notifications
           </p>
         </div>
       </div>
-    </Link>
+    </div>
   );
+
+  if (notification.link) {
+    return <Link href={notification.link}>{content}</Link>;
+  }
+  return content;
 }
 
 function QuickActionCard({

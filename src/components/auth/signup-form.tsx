@@ -53,10 +53,27 @@ export function SignupForm() {
 
   async function onSubmit(data: SignupFormValues) {
     setIsLoading(true);
-    // TODO: Implement actual signup logic
-    console.log("Signup data:", data);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setIsLoading(false);
+    try {
+      const res = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        form.setError("root", { message: result.error || "Signup failed" });
+        return;
+      }
+
+      // Redirect to profile creation
+      window.location.href = "/create-profile";
+    } catch {
+      form.setError("root", { message: "Something went wrong. Please try again." });
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -74,6 +91,11 @@ export function SignupForm() {
       {/* Form */}
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+          {form.formState.errors.root && (
+            <div className="p-3 rounded-[8px] bg-red-50 border border-red-200 text-red-700 text-sm">
+              {form.formState.errors.root.message}
+            </div>
+          )}
           <FormField
             control={form.control}
             name="name"

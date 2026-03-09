@@ -39,10 +39,28 @@ export function LoginForm() {
 
   async function onSubmit(data: LoginFormValues) {
     setIsLoading(true);
-    // TODO: Implement actual login logic
-    console.log("Login data:", data);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setIsLoading(false);
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        form.setError("root", { message: result.error || "Login failed" });
+        return;
+      }
+
+      // Redirect based on role
+      const redirectTo = result.role === "admin" ? "/admin" : "/dashboard";
+      window.location.href = redirectTo;
+    } catch {
+      form.setError("root", { message: "Something went wrong. Please try again." });
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -60,6 +78,11 @@ export function LoginForm() {
       {/* Form */}
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+          {form.formState.errors.root && (
+            <div className="p-3 rounded-[8px] bg-red-50 border border-red-200 text-red-700 text-sm">
+              {form.formState.errors.root.message}
+            </div>
+          )}
           <FormField
             control={form.control}
             name="email"
