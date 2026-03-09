@@ -117,7 +117,16 @@ export async function updateSession(request: NextRequest) {
   }
 
   // Redirect authenticated users away from auth pages
+  // But only if their email is confirmed (don't redirect unverified users from signup)
   if (user && (pathname === "/login" || pathname === "/signup")) {
+    // Check if email is confirmed
+    const emailConfirmed = user.email_confirmed_at != null;
+    
+    // Don't redirect unverified users - let them see the "check your email" message
+    if (!emailConfirmed && pathname === "/signup") {
+      return supabaseResponse;
+    }
+
     // Check if user has completed onboarding
     const { data: profile } = await supabase
       .from("profiles")

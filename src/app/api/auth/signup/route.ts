@@ -42,19 +42,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    // Create initial profile
+    // Update the auto-created profile with signup details
+    // (profile is auto-created by database trigger on auth.users insert)
     if (data.user) {
       const { error: profileError } = await supabase
         .from("profiles")
-        .insert({
-          user_id: data.user.id,
+        .update({
           created_by: profileFor === "family" ? "parent" : "self",
-          status: "draft",
-          basic_info: { name },
-        });
+          basic_info: { name, phone },
+        })
+        .eq("user_id", data.user.id);
 
       if (profileError) {
-        console.error("Profile creation error:", profileError);
+        console.error("Profile update error:", profileError);
       }
     }
 
