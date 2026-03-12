@@ -31,6 +31,107 @@ interface ProfileData {
   verification?: VerificationValues;
 }
 
+function mapBasicInfo(data: BasicInfoValues) {
+  return {
+    created_by: data.profileCreatedBy,
+    basic_info: {
+      name: data.fullName,
+      date_of_birth:
+        data.dateOfBirth instanceof Date
+          ? data.dateOfBirth.toISOString().split("T")[0]
+          : undefined,
+      gender: data.gender,
+      location: data.city,
+    },
+  };
+}
+
+function mapEducation(data: EducationValues) {
+  return {
+    education_career: {
+      education_level: data.highestEducation,
+      institution: data.institution,
+      field_of_study: data.fieldOfStudy,
+      occupation: data.occupation,
+      company: data.company || undefined,
+      years_of_experience: data.yearsExperience,
+      career_aspiration: data.careerAspiration,
+      work_life_balance: String(data.workLifeBalance),
+    },
+  };
+}
+
+function mapFamily(data: FamilyValues) {
+  const parsedSiblings = Number.parseInt(data.siblingsCount, 10);
+  return {
+    family_background: {
+      family_type: data.familyType,
+      father_occupation: data.fatherOccupation,
+      mother_occupation: data.motherOccupation,
+      siblings: Number.isNaN(parsedSiblings) ? data.siblingsCount : String(parsedSiblings),
+      religious_practice: data.religiousPractice,
+      socioeconomic: data.socioeconomic || undefined,
+    },
+  };
+}
+
+function mapValues(data: ValuesValues) {
+  return {
+    values_beliefs: {
+      religious_observance: data.religiousObservance,
+      gender_roles: data.genderRoles,
+      financial_management: data.financialManagement,
+      decision_making: data.decisionMaking,
+      living_with_inlaws: data.livingWithInLaws,
+      working_after_marriage: data.workingAfterMarriage,
+    },
+  };
+}
+
+function mapLifestyle(data: LifestyleValues) {
+  return {
+    lifestyle: {
+      routine: data.dailyRoutine,
+      social_style: data.socialStyle,
+      hobbies: data.hobbies,
+      health_fitness: data.healthFitness,
+      travel: data.travelPreference,
+      diet: data.dietaryPreference,
+    },
+  };
+}
+
+function mapPersonality(data: PersonalityValues) {
+  return {
+    personality: {
+      self_description: data.selfDescription,
+      communication_style: data.communicationStyle,
+      conflict_resolution: data.conflictResolution,
+      love_language: data.loveLanguage,
+      friend_words: data.threeWords
+        .split(",")
+        .map((word) => word.trim())
+        .filter(Boolean)
+        .slice(0, 3),
+    },
+  };
+}
+
+function mapPreferences(data: PreferencesValues) {
+  return {
+    partner_preferences: {
+      age_min: data.ageRange[0],
+      age_max: data.ageRange[1],
+      education_min: data.educationMinimum,
+      location_preferences: data.locationPreferences,
+      must_haves: data.mustHaves,
+      deal_breakers: data.dealBreakers,
+      nice_to_haves: data.niceToHaves,
+      openness: String(data.openness),
+    },
+  };
+}
+
 export function ProfileWizard() {
   const router = useRouter();
   const { profile, updateProfile, uploadPhoto, uploadDocument, submitProfile } = useProfile();
@@ -102,13 +203,13 @@ export function ProfileWizard() {
     setIsSaving(true);
     try {
       const updatePayload: Record<string, unknown> = {};
-      if (profileData.basicInfo) updatePayload.basic_info = profileData.basicInfo;
-      if (profileData.education) updatePayload.education_career = profileData.education;
-      if (profileData.family) updatePayload.family_background = profileData.family;
-      if (profileData.values) updatePayload.values_beliefs = profileData.values;
-      if (profileData.lifestyle) updatePayload.lifestyle = profileData.lifestyle;
-      if (profileData.personality) updatePayload.personality = profileData.personality;
-      if (profileData.preferences) updatePayload.partner_preferences = profileData.preferences;
+      if (profileData.basicInfo) Object.assign(updatePayload, mapBasicInfo(profileData.basicInfo));
+      if (profileData.education) Object.assign(updatePayload, mapEducation(profileData.education));
+      if (profileData.family) Object.assign(updatePayload, mapFamily(profileData.family));
+      if (profileData.values) Object.assign(updatePayload, mapValues(profileData.values));
+      if (profileData.lifestyle) Object.assign(updatePayload, mapLifestyle(profileData.lifestyle));
+      if (profileData.personality) Object.assign(updatePayload, mapPersonality(profileData.personality));
+      if (profileData.preferences) Object.assign(updatePayload, mapPreferences(profileData.preferences));
 
       if (Object.keys(updatePayload).length > 0) {
         await updateProfile(updatePayload);
@@ -124,9 +225,9 @@ export function ProfileWizard() {
   };
 
   // Save step data to the server
-  const saveStepToServer = async (section: string, data: unknown) => {
+  const saveStepToServer = async (payload: Record<string, unknown>) => {
     try {
-      await updateProfile({ [section]: data });
+      await updateProfile(payload);
     } catch {
       // Silently fail on auto-save - user can manually save draft
     }
@@ -137,13 +238,13 @@ export function ProfileWizard() {
     try {
       // Save all data first
       const updatePayload: Record<string, unknown> = {};
-      if (profileData.basicInfo) updatePayload.basic_info = profileData.basicInfo;
-      if (profileData.education) updatePayload.education_career = profileData.education;
-      if (profileData.family) updatePayload.family_background = profileData.family;
-      if (profileData.values) updatePayload.values_beliefs = profileData.values;
-      if (profileData.lifestyle) updatePayload.lifestyle = profileData.lifestyle;
-      if (profileData.personality) updatePayload.personality = profileData.personality;
-      if (profileData.preferences) updatePayload.partner_preferences = profileData.preferences;
+      if (profileData.basicInfo) Object.assign(updatePayload, mapBasicInfo(profileData.basicInfo));
+      if (profileData.education) Object.assign(updatePayload, mapEducation(profileData.education));
+      if (profileData.family) Object.assign(updatePayload, mapFamily(profileData.family));
+      if (profileData.values) Object.assign(updatePayload, mapValues(profileData.values));
+      if (profileData.lifestyle) Object.assign(updatePayload, mapLifestyle(profileData.lifestyle));
+      if (profileData.personality) Object.assign(updatePayload, mapPersonality(profileData.personality));
+      if (profileData.preferences) Object.assign(updatePayload, mapPreferences(profileData.preferences));
 
       if (Object.keys(updatePayload).length > 0) {
         await updateProfile(updatePayload);
@@ -168,51 +269,55 @@ export function ProfileWizard() {
   // Step handlers
   const handleBasicInfo = (data: BasicInfoValues) => {
     updateProfileData("basicInfo", data);
-    saveStepToServer("basic_info", data);
+    saveStepToServer(mapBasicInfo(data));
     goToNextStep();
   };
 
   const handleEducation = (data: EducationValues) => {
     updateProfileData("education", data);
-    saveStepToServer("education_career", data);
+    saveStepToServer(mapEducation(data));
     goToNextStep();
   };
 
   const handleFamily = (data: FamilyValues) => {
     updateProfileData("family", data);
-    saveStepToServer("family_background", data);
+    saveStepToServer(mapFamily(data));
     goToNextStep();
   };
 
   const handleValues = (data: ValuesValues) => {
     updateProfileData("values", data);
-    saveStepToServer("values_beliefs", data);
+    saveStepToServer(mapValues(data));
     goToNextStep();
   };
 
   const handleLifestyle = (data: LifestyleValues) => {
     updateProfileData("lifestyle", data);
-    saveStepToServer("lifestyle", data);
+    saveStepToServer(mapLifestyle(data));
     goToNextStep();
   };
 
   const handlePersonality = (data: PersonalityValues) => {
     updateProfileData("personality", data);
-    saveStepToServer("personality", data);
+    saveStepToServer(mapPersonality(data));
     goToNextStep();
   };
 
   const handlePreferences = (data: PreferencesValues) => {
     updateProfileData("preferences", data);
-    saveStepToServer("partner_preferences", data);
+    saveStepToServer(mapPreferences(data));
     goToNextStep();
   };
 
-  const dataUrlToFile = (dataUrl: string, filename: string): File => {
+  const dataUrlToFile = (dataUrl: unknown, filename: string): File => {
+    if (typeof dataUrl !== "string") {
+      throw new Error("Invalid file data");
+    }
+
     const [header, base64] = dataUrl.split(",");
 
     if (!header || !base64) {
-      throw new Error("Invalid image data");
+      throw new Error("Invalid file data");
     }
 
     const mime = header.match(/:(.*?);/)?.[1] || "image/jpeg";
@@ -236,8 +341,11 @@ export function ProfileWizard() {
     }
     if (data.additionalPhotos) {
       for (let i = 0; i < data.additionalPhotos.length; i++) {
+        const photoData = data.additionalPhotos[i];
+        if (typeof photoData !== "string") continue;
+
         try {
-          const file = dataUrlToFile(data.additionalPhotos[i], `additional-${i}.jpg`);
+          const file = dataUrlToFile(photoData, `additional-${i}.jpg`);
           await uploadPhoto(file);
         } catch {
           // Continue uploading remaining photos
@@ -249,15 +357,23 @@ export function ProfileWizard() {
 
   const handleVerification = async (data: VerificationValues) => {
     updateProfileData("verification", data);
+
+    const apiDocumentType = data.documentType === "national-id" ? "nid" : data.documentType;
+
     if (data.documentImage) {
       try {
         const file = dataUrlToFile(data.documentImage, "verification-doc.jpg");
-        await uploadDocument(file, data.documentType || "nid");
+        await uploadDocument(file, apiDocumentType);
         toast.success("Document uploaded!");
-      } catch {
-        toast.error("Failed to upload document");
+        goToNextStep();
+        return;
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Failed to upload document";
+        toast.error(message);
+        return;
       }
     }
+
     goToNextStep();
   };
 
