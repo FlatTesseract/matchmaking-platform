@@ -115,7 +115,9 @@ export function StepReview({ profileData, onEdit, onSubmit, onBack, isSubmitting
     }
   };
 
-  const formatLabel = (value: string) => {
+  const formatLabel = (value: unknown) => {
+    if (typeof value !== "string") return "-";
+
     return value
       .split("-")
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))

@@ -102,13 +102,15 @@ function mapLifestyle(data: LifestyleValues) {
 }
 
 function mapPersonality(data: PersonalityValues) {
+  const wordsSource = typeof data.threeWords === "string" ? data.threeWords : "";
+
   return {
     personality: {
       self_description: data.selfDescription,
       communication_style: data.communicationStyle,
       conflict_resolution: data.conflictResolution,
       love_language: data.loveLanguage,
-      friend_words: data.threeWords
+      friend_words: wordsSource
         .split(",")
         .map((word) => word.trim())
         .filter(Boolean)
