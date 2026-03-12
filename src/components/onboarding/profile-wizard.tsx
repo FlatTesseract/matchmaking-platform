@@ -210,6 +210,11 @@ export function ProfileWizard() {
 
   const dataUrlToFile = (dataUrl: string, filename: string): File => {
     const [header, base64] = dataUrl.split(",");
+
+    if (!header || !base64) {
+      throw new Error("Invalid image data");
+    }
+
     const mime = header.match(/:(.*?);/)?.[1] || "image/jpeg";
     const binary = atob(base64);
     const bytes = new Uint8Array(binary.length);
@@ -224,8 +229,9 @@ export function ProfileWizard() {
         const file = dataUrlToFile(data.primaryPhoto, "primary.jpg");
         await uploadPhoto(file);
         toast.success("Photo uploaded!");
-      } catch {
-        toast.error("Failed to upload photo");
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Failed to upload photo";
+        toast.error(message);
       }
     }
     if (data.additionalPhotos) {

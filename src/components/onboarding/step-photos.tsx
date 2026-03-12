@@ -22,6 +22,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 const photosSchema = z.object({
   primaryPhoto: z.string().min(1, "Please upload a primary photo"),
@@ -34,6 +35,28 @@ interface StepPhotosProps {
   defaultValues?: Partial<PhotosValues>;
   onNext: (data: PhotosValues) => void;
   onBack: () => void;
+}
+
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const MAX_FILE_SIZE_MB = 5;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
+function validateImageFile(file: File): boolean {
+  if (!ALLOWED_TYPES.includes(file.type)) {
+    toast.error("Unsupported image format", {
+      description: "Please upload JPG, PNG, or WebP images.",
+    });
+    return false;
+  }
+
+  if (file.size > MAX_FILE_SIZE_BYTES) {
+    toast.error("Image too large", {
+      description: `Please upload an image under ${MAX_FILE_SIZE_MB}MB.`,
+    });
+    return false;
+  }
+
+  return true;
 }
 
 export function StepPhotos({ defaultValues, onNext, onBack }: StepPhotosProps) {
@@ -50,28 +73,28 @@ export function StepPhotos({ defaultValues, onNext, onBack }: StepPhotosProps) {
   });
 
   const handlePrimaryPhoto = useCallback((file: File) => {
-    if (file && file.type.startsWith("image/")) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const result = reader.result as string;
-        setPrimaryPreview(result);
-        form.setValue("primaryPhoto", result, { shouldValidate: true });
-      };
-      reader.readAsDataURL(file);
-    }
+    if (!file || !validateImageFile(file)) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result as string;
+      setPrimaryPreview(result);
+      form.setValue("primaryPhoto", result, { shouldValidate: true });
+    };
+    reader.readAsDataURL(file);
   }, [form]);
 
   const handleAdditionalPhoto = useCallback((file: File) => {
-    if (file && file.type.startsWith("image/") && additionalPreviews.length < 5) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const result = reader.result as string;
-        const newPreviews = [...additionalPreviews, result];
-        setAdditionalPreviews(newPreviews);
-        form.setValue("additionalPhotos", newPreviews, { shouldValidate: true });
-      };
-      reader.readAsDataURL(file);
-    }
+    if (!file || additionalPreviews.length >= 5 || !validateImageFile(file)) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result as string;
+      const newPreviews = [...additionalPreviews, result];
+      setAdditionalPreviews(newPreviews);
+      form.setValue("additionalPhotos", newPreviews, { shouldValidate: true });
+    };
+    reader.readAsDataURL(file);
   }, [additionalPreviews, form]);
 
   const removeAdditionalPhoto = (index: number) => {
@@ -181,7 +204,7 @@ export function StepPhotos({ defaultValues, onNext, onBack }: StepPhotosProps) {
                     </span>
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/jpeg,image/png,image/webp"
                       className="hidden"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
@@ -241,7 +264,7 @@ export function StepPhotos({ defaultValues, onNext, onBack }: StepPhotosProps) {
                       <span className="text-xs text-warm-gray">Add</span>
                       <input
                         type="file"
-                        accept="image/*"
+                        accept="image/jpeg,image/png,image/webp"
                         className="hidden"
                         onChange={(e) => {
                           const file = e.target.files?.[0];
