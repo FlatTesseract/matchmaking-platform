@@ -151,25 +151,91 @@ export function ProfileWizard() {
     if (profile) {
       const data: ProfileData = {};
       if (profile.basic_info && Object.keys(profile.basic_info).length > 0) {
-        data.basicInfo = profile.basic_info;
+        const dobRaw = profile.basic_info.date_of_birth;
+        data.basicInfo = {
+          fullName: profile.basic_info.name || "",
+          dateOfBirth: typeof dobRaw === "string" ? new Date(dobRaw) : dobRaw,
+          gender: profile.basic_info.gender,
+          city: profile.basic_info.location || "",
+          phone: profile.phone || "",
+          profileCreatedBy: profile.created_by || "self",
+        } as BasicInfoValues;
       }
       if (profile.education_career && Object.keys(profile.education_career).length > 0) {
-        data.education = profile.education_career;
+        data.education = {
+          highestEducation: profile.education_career.education_level || "",
+          institution: profile.education_career.institution || "",
+          fieldOfStudy: profile.education_career.field_of_study || "",
+          occupation: profile.education_career.occupation || "",
+          company: profile.education_career.company || "",
+          yearsExperience: profile.education_career.years_of_experience || 0,
+          careerAspiration: profile.education_career.career_aspiration,
+          workLifeBalance: Number(profile.education_career.work_life_balance || 3),
+        } as EducationValues;
       }
       if (profile.family_background && Object.keys(profile.family_background).length > 0) {
-        data.family = profile.family_background;
+        data.family = {
+          familyType: profile.family_background.family_type,
+          fatherOccupation: profile.family_background.father_occupation || "",
+          motherOccupation: profile.family_background.mother_occupation || "",
+          siblingsCount: profile.family_background.siblings || "",
+          siblingsMarried: "",
+          religiousPractice: profile.family_background.religious_practice,
+          socioeconomic: profile.family_background.socioeconomic || "",
+        } as FamilyValues;
       }
       if (profile.values_beliefs && Object.keys(profile.values_beliefs).length > 0) {
-        data.values = profile.values_beliefs;
+        data.values = {
+          religiousObservance: profile.values_beliefs.religious_observance,
+          genderRoles: profile.values_beliefs.gender_roles,
+          financialManagement: profile.values_beliefs.financial_management,
+          decisionMaking: profile.values_beliefs.decision_making,
+          livingWithInLaws: profile.values_beliefs.living_with_inlaws,
+          workingAfterMarriage: profile.values_beliefs.working_after_marriage,
+        } as ValuesValues;
       }
       if (profile.lifestyle && Object.keys(profile.lifestyle).length > 0) {
-        data.lifestyle = profile.lifestyle;
+        data.lifestyle = {
+          dailyRoutine: profile.lifestyle.routine,
+          socialStyle: profile.lifestyle.social_style,
+          hobbies: Array.isArray(profile.lifestyle.hobbies) ? profile.lifestyle.hobbies : [],
+          healthFitness: profile.lifestyle.health_fitness,
+          travelPreference: profile.lifestyle.travel,
+          dietaryPreference: profile.lifestyle.diet || "",
+        } as LifestyleValues;
       }
       if (profile.personality && Object.keys(profile.personality).length > 0) {
-        data.personality = profile.personality;
+        data.personality = {
+          selfDescription: profile.personality.self_description || "",
+          communicationStyle: profile.personality.communication_style,
+          conflictResolution: profile.personality.conflict_resolution,
+          loveLanguage: profile.personality.love_language,
+          threeWords: Array.isArray(profile.personality.friend_words)
+            ? profile.personality.friend_words.join(", ")
+            : "",
+        } as PersonalityValues;
       }
       if (profile.partner_preferences && Object.keys(profile.partner_preferences).length > 0) {
-        data.preferences = profile.partner_preferences;
+        data.preferences = {
+          ageRange: [
+            Number(profile.partner_preferences.age_min || 24),
+            Number(profile.partner_preferences.age_max || 32),
+          ],
+          educationMinimum: profile.partner_preferences.education_min || "",
+          locationPreferences: Array.isArray(profile.partner_preferences.location_preferences)
+            ? profile.partner_preferences.location_preferences
+            : [],
+          mustHaves: Array.isArray(profile.partner_preferences.must_haves)
+            ? profile.partner_preferences.must_haves
+            : [],
+          dealBreakers: Array.isArray(profile.partner_preferences.deal_breakers)
+            ? profile.partner_preferences.deal_breakers
+            : [],
+          niceToHaves: Array.isArray(profile.partner_preferences.nice_to_haves)
+            ? profile.partner_preferences.nice_to_haves
+            : [],
+          openness: Number(profile.partner_preferences.openness || 3),
+        } as PreferencesValues;
       }
       setProfileData(data);
     }
@@ -242,6 +308,17 @@ export function ProfileWizard() {
 
   const handleSubmit = async () => {
     if (isSaving) return;
+
+    if (!profileData.basicInfo?.fullName || !profileData.basicInfo?.gender) {
+      toast.error("Please complete basic information before submitting");
+      return;
+    }
+
+    if (!profileData.photos?.primaryPhoto) {
+      toast.error("Please upload at least one photo before submitting");
+      return;
+    }
+
     setIsSaving(true);
     try {
       // Save all data first

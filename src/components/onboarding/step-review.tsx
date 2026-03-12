@@ -152,7 +152,12 @@ export function StepReview({ profileData, onEdit, onSubmit, onBack, isSubmitting
               <InfoRow label="Full Name" value={profileData.basicInfo.fullName} />
               <InfoRow 
                 label="Date of Birth" 
-                value={profileData.basicInfo.dateOfBirth ? format(profileData.basicInfo.dateOfBirth, "PPP") : "-"} 
+                value={(() => {
+                  const dob = profileData.basicInfo.dateOfBirth;
+                  if (!dob) return "-";
+                  const dateValue = dob instanceof Date ? dob : new Date(dob);
+                  return Number.isNaN(dateValue.getTime()) ? "-" : format(dateValue, "PPP");
+                })()} 
               />
               <InfoRow label="Gender" value={formatLabel(profileData.basicInfo.gender || "")} />
               <InfoRow label="City" value={formatLabel(profileData.basicInfo.city)} />

@@ -21,7 +21,12 @@ export function useProfile() {
 
     if (!res.ok) {
       const data = await res.json();
-      throw new Error(data.error || "Failed to update profile");
+      const details = Array.isArray(data?.details) ? data.details : [];
+      const firstDetail = details[0];
+      const detailMsg = firstDetail?.message
+        ? `${firstDetail.message}${firstDetail.path ? ` (${firstDetail.path.join(".")})` : ""}`
+        : null;
+      throw new Error(detailMsg || data.error || "Failed to update profile");
     }
 
     const result = await res.json();
