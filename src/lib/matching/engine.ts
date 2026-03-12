@@ -57,7 +57,7 @@ function passesDealBreakers(
         profile.basic_info.location &&
         !candidateInfo.location
           .toLowerCase()
-          .includes(profile.basic_info.location.toLowerCase().split(",")[0])
+          .includes(getCityToken(profile.basic_info.location))
       ) {
         return false;
       }
@@ -76,6 +76,11 @@ function calculateAge(dateOfBirth: string): number {
     age--;
   }
   return age;
+}
+
+function getCityToken(value: unknown): string {
+  if (typeof value !== "string") return "";
+  return value.split(",")[0]?.toLowerCase().trim() || "";
 }
 
 // ============================================================
@@ -275,9 +280,9 @@ function scorePractical(a: ProfileData, b: ProfileData): number {
 
   // Location compatibility
   if (a.basic_info.location && b.basic_info.location) {
-    const aCity = a.basic_info.location.split(",")[0].toLowerCase().trim();
-    const bCity = b.basic_info.location.split(",")[0].toLowerCase().trim();
-    if (aCity === bCity) score += 20;
+    const aCity = getCityToken(a.basic_info.location);
+    const bCity = getCityToken(b.basic_info.location);
+    if (aCity && bCity && aCity === bCity) score += 20;
     // Both in same country
     else if (
       (a.basic_info.location.toLowerCase().includes("dhaka") &&
