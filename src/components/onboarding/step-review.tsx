@@ -101,6 +101,11 @@ function InfoRow({ label, value }: { label: string; value: string | React.ReactN
 export function StepReview({ profileData, onEdit, onSubmit, onBack, isSubmitting = false }: StepReviewProps) {
   const submitLockRef = useRef(false);
 
+  const preferencesAgeRange =
+    Array.isArray(profileData.preferences?.ageRange) && profileData.preferences.ageRange.length >= 2
+      ? profileData.preferences.ageRange
+      : [21, 35];
+
   const handleSubmit = async () => {
     if (isSubmitting || submitLockRef.current) return;
 
@@ -211,7 +216,7 @@ export function StepReview({ profileData, onEdit, onSubmit, onBack, isSubmitting
                 label="Hobbies" 
                 value={
                   <div className="flex flex-wrap gap-1 mt-1 sm:mt-0">
-                    {profileData.lifestyle.hobbies.map((hobby) => (
+                    {(Array.isArray(profileData.lifestyle.hobbies) ? profileData.lifestyle.hobbies : []).map((hobby) => (
                       <Badge key={hobby} variant="secondary" className="bg-soft-rose text-dark text-xs">
                         {hobby}
                       </Badge>
@@ -248,13 +253,13 @@ export function StepReview({ profileData, onEdit, onSubmit, onBack, isSubmitting
         {profileData.preferences && (
           <ReviewSection title="Partner Preferences" icon={Target} step={7} onEdit={onEdit}>
             <div className="divide-y divide-rose-muted/30">
-              <InfoRow label="Age Range" value={`${profileData.preferences.ageRange[0]} - ${profileData.preferences.ageRange[1]} years`} />
+              <InfoRow label="Age Range" value={`${preferencesAgeRange[0]} - ${preferencesAgeRange[1]} years`} />
               <InfoRow label="Min Education" value={formatLabel(profileData.preferences.educationMinimum)} />
               <InfoRow 
                 label="Locations" 
                 value={
                   <div className="flex flex-wrap gap-1 mt-1 sm:mt-0">
-                    {profileData.preferences.locationPreferences.map((loc) => (
+                    {(Array.isArray(profileData.preferences.locationPreferences) ? profileData.preferences.locationPreferences : []).map((loc) => (
                       <Badge key={loc} variant="secondary" className="bg-soft-rose text-dark text-xs">
                         {loc}
                       </Badge>
@@ -266,7 +271,7 @@ export function StepReview({ profileData, onEdit, onSubmit, onBack, isSubmitting
                 label="Must-Haves" 
                 value={
                   <div className="flex flex-wrap gap-1 mt-1 sm:mt-0">
-                    {profileData.preferences.mustHaves.map((item) => (
+                    {(Array.isArray(profileData.preferences.mustHaves) ? profileData.preferences.mustHaves : []).map((item) => (
                       <Badge key={item} variant="secondary" className="bg-burgundy/10 text-burgundy text-xs">
                         {item}
                       </Badge>
@@ -274,12 +279,12 @@ export function StepReview({ profileData, onEdit, onSubmit, onBack, isSubmitting
                   </div>
                 } 
               />
-              {profileData.preferences.dealBreakers.length > 0 && (
+              {(Array.isArray(profileData.preferences.dealBreakers) ? profileData.preferences.dealBreakers.length : 0) > 0 && (
                 <InfoRow 
                   label="Deal-Breakers" 
                   value={
                     <div className="flex flex-wrap gap-1 mt-1 sm:mt-0">
-                      {profileData.preferences.dealBreakers.map((item) => (
+                      {(Array.isArray(profileData.preferences.dealBreakers) ? profileData.preferences.dealBreakers : []).map((item) => (
                         <Badge key={item} variant="secondary" className="bg-destructive/10 text-destructive text-xs">
                           {item}
                         </Badge>
@@ -308,7 +313,7 @@ export function StepReview({ profileData, onEdit, onSubmit, onBack, isSubmitting
                   <p className="text-xs text-center text-gold-dark mt-1">Primary</p>
                 </div>
               )}
-              {profileData.photos.additionalPhotos.map((photo, index) => (
+              {(Array.isArray(profileData.photos.additionalPhotos) ? profileData.photos.additionalPhotos : []).map((photo, index) => (
                 <div key={index} className="flex-shrink-0">
                   <div className="w-20 h-20 rounded-[8px] overflow-hidden border border-gold-light">
                     <img 

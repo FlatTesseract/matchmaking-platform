@@ -120,15 +120,19 @@ function mapPersonality(data: PersonalityValues) {
 }
 
 function mapPreferences(data: PreferencesValues) {
+  const ageRange = Array.isArray(data.ageRange) && data.ageRange.length >= 2
+    ? data.ageRange
+    : [21, 35];
+
   return {
     partner_preferences: {
-      age_min: data.ageRange[0],
-      age_max: data.ageRange[1],
+      age_min: ageRange[0],
+      age_max: ageRange[1],
       education_min: data.educationMinimum,
-      location_preferences: data.locationPreferences,
-      must_haves: data.mustHaves,
-      deal_breakers: data.dealBreakers,
-      nice_to_haves: data.niceToHaves,
+      location_preferences: Array.isArray(data.locationPreferences) ? data.locationPreferences : [],
+      must_haves: Array.isArray(data.mustHaves) ? data.mustHaves : [],
+      deal_breakers: Array.isArray(data.dealBreakers) ? data.dealBreakers : [],
+      nice_to_haves: Array.isArray(data.niceToHaves) ? data.niceToHaves : [],
       openness: String(data.openness),
     },
   };

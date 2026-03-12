@@ -101,15 +101,22 @@ export function StepPreferences({ defaultValues, onNext, onBack }: StepPreferenc
     },
   });
 
-  const ageRange = form.watch("ageRange");
+  const watchedAgeRange = form.watch("ageRange");
+  const ageRange = Array.isArray(watchedAgeRange) && watchedAgeRange.length >= 2 ? watchedAgeRange : [24, 32];
   const openness = form.watch("openness");
-  const selectedLocations = form.watch("locationPreferences");
-  const selectedMustHaves = form.watch("mustHaves");
-  const selectedDealBreakers = form.watch("dealBreakers");
-  const selectedNiceToHaves = form.watch("niceToHaves");
+  const selectedLocationsRaw = form.watch("locationPreferences");
+  const selectedMustHavesRaw = form.watch("mustHaves");
+  const selectedDealBreakersRaw = form.watch("dealBreakers");
+  const selectedNiceToHavesRaw = form.watch("niceToHaves");
+
+  const selectedLocations = Array.isArray(selectedLocationsRaw) ? selectedLocationsRaw : [];
+  const selectedMustHaves = Array.isArray(selectedMustHavesRaw) ? selectedMustHavesRaw : [];
+  const selectedDealBreakers = Array.isArray(selectedDealBreakersRaw) ? selectedDealBreakersRaw : [];
+  const selectedNiceToHaves = Array.isArray(selectedNiceToHavesRaw) ? selectedNiceToHavesRaw : [];
 
   const toggleArrayField = (field: "locationPreferences" | "mustHaves" | "dealBreakers" | "niceToHaves", value: string) => {
-    const current = form.getValues(field);
+    const currentRaw = form.getValues(field);
+    const current = Array.isArray(currentRaw) ? currentRaw : [];
     if (current.includes(value)) {
       form.setValue(field, current.filter((v) => v !== value), { shouldValidate: true });
     } else {
